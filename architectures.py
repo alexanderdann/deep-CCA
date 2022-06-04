@@ -11,7 +11,7 @@ torch.set_default_tensor_type(torch.DoubleTensor)
 
 
 def CCA(view1, view2, r1=0, r2=0, shared_dim=None):
-    V1, V2 = torch.from_numpy(view1), torch.from_numpy(view1)
+    V1, V2 = torch.from_numpy(view1), torch.from_numpy(view2)
     o1 = o2 = V1.size(0)
     m = V1.size(1)
     
@@ -27,8 +27,8 @@ def CCA(view1, view2, r1=0, r2=0, shared_dim=None):
     SigmaHat11 = torch.matmul(V1_bar, V1_bar.t()) / (m - 1) + r1 * torch.eye(o1)
     SigmaHat22 = torch.matmul(V2_bar, V2_bar.t()) / (m - 1) + r2 * torch.eye(o2)
     
-    SigmaHat11RootInv = sqrtm(torch.inverse(SigmaHat11))
-    SigmaHat22RootInv = sqrtm(torch.inverse(SigmaHat22))
+    SigmaHat11RootInv = sqrtm(torch.linalg.inv(SigmaHat11))
+    SigmaHat22RootInv = sqrtm(torch.linalg.inv(SigmaHat22))
 
     C = torch.linalg.multi_dot([SigmaHat11RootInv, SigmaHat12, SigmaHat22RootInv])
     
@@ -118,7 +118,7 @@ class deepCCA(nn.Module):
                 if epoch_idx % 5 == 0:
                     writer.add_scalar('Losses/CCA Loss', cca_loss, epoch_idx)
                     writer.add_scalar('Losses/L2 Loss', reg_loss, epoch_idx)
-                    writer.add_scalar('Losses/Total Loss', loss, epoch_idx)
+                    writer.add_scalar('Losses/Adam Loss', loss, epoch_idx)
                     writer.close()
 
                 optimizer.step()  
@@ -144,7 +144,7 @@ class deepCCA(nn.Module):
                     if epoch_idx % 5 == 0:
                         writer.add_scalar('Losses/CCA Loss', cca_loss, epoch_idx)
                         writer.add_scalar('Losses/L2 Loss', reg_loss, epoch_idx)
-                        writer.add_scalar('Losses/Total Loss', loss, epoch_idx)
+                        writer.add_scalar('Losses/LBFGS Loss', loss, epoch_idx)
                         writer.close()
 
                     return loss
@@ -168,19 +168,8 @@ class loss_fn(nn.Module):
         SigmaHat11 = torch.add(torch.matmul(H1bar, H1bar.t()) / (m - 1), r1 * torch.eye(o1))
         SigmaHat22 = torch.add(torch.matmul(H2bar, H2bar.t()) / (m - 1), r2 * torch.eye(o2))
         
-        [D1, V1] = torch.linalg.eigh(SigmaHat11, UPLO='U')
-        [D2, V2] = torch.linalg.eigh(SigmaHat22, UPLO='U')
-        
-        posInd1 = torch.gt(D1, eps).nonzero()[:, 0]
-        D1 = D1[posInd1]
-        V1 = V1[:, posInd1]
-        
-        posInd2 = torch.gt(D2, eps).nonzero()[:, 0]
-        D2 = D2[posInd2]
-        V2 = V2[:, posInd2]
-        
-        SigmaHat11RootInv = torch.matmul(torch.matmul(V1, torch.diag(D1 ** -0.5)), V1.t())
-        SigmaHat22RootInv = torch.matmul(torch.matmul(V2, torch.diag(D2 ** -0.5)), V2.t())
+        SigmaHat11RootInv = sqrtm(torch.linalg.inv(SigmaHat11))
+        SigmaHat22RootInv = sqrtm(torch.linalg.inv(SigmaHat22))
         
         Tval = torch.linalg.multi_dot([SigmaHat11RootInv, SigmaHat12, SigmaHat22RootInv])
         TT = torch.matmul(Tval.t(), Tval)

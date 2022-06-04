@@ -9,6 +9,7 @@ class EarlyStoppingCallback:
         
         if (torch.std(losses[-idx:]) < condition) and (idx < len(losses)):
             return True
+        
         else:
             return False
         
